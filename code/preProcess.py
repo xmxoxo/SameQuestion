@@ -4,22 +4,13 @@
 __author__ = 'xmxoxo<xmxoxo@qq.com>'
 
 import os
-import sys
-import re
-import json
-import random
-import time
-import string
 import pandas as pd
 import numpy as np
-import traceback
-import logging
-import shutil
 from itertools import combinations
-from itertools import product
 import xmltodict
 
 from pandas.core.frame import DataFrame
+from nlpEDA import *
 
 
 # 读入文件
@@ -64,7 +55,7 @@ def mergeDev():
 
 
 '''
-#生成训练数据集
+生成训练数据集
 
 数据格式：
 	<TrainCorpus>
@@ -108,8 +99,8 @@ def CreateTrain():
     out_train = os.path.join(path, 'train.tsv')
     out_dev = os.path.join(path, 'dev.tsv')
 
-    txtxml = readtxtfile(train_xml)
-    ojson = xmltodict.parse(txtxml)
+    txt_xml = readtxtfile(train_xml)
+    ojson = xmltodict.parse(txt_xml)
     length_questions = len(ojson['TrainCorpus']['Questions'])
     print('Questions Count: %d' % length_questions)
     print(ojson['TrainCorpus']['Questions'][0]['EquivalenceQuestions']['question'])
@@ -120,23 +111,29 @@ def CreateTrain():
     # 组合所有匹配
     data_all = []
     for i in range(length_questions):
-        lstEqu = ojson['TrainCorpus']['Questions'][i]['EquivalenceQuestions']['question']
-        lstNotEqu = ojson['TrainCorpus']['Questions'][i]['NotEquivalenceQuestions']['question']
-        data = append_DataFrame(lstEqu, lstNotEqu)
+        lst_Equ = ojson['TrainCorpus']['Questions'][i]['EquivalenceQuestions']['question']
+        lst_NotEqu = ojson['TrainCorpus']['Questions'][i]['NotEquivalenceQuestions']['question']
+        # 2019/11/15 原始数据中含有空数据，要进行清除。 
+        # 测试用例： Questions number="3316"
+        lst_Equ = list(filter(None, lst_Equ))
+        lst_NotEqu = list(filter(None, lst_NotEqu))
+       
+        data = append_DataFrame(lst_Equ, lst_NotEqu)
         data_all.extend(data)
 
-    df_out = DataFrame(data_all,columns=['question1','question2','lable'])
+    df_out = DataFrame(data_all, columns=['question1', 'question2', 'lable'])
     print(df_out.head())
     df_out.to_csv(out_file, sep="\t", index=0)
 
-    #打乱拆分成train和dev，比例 8:2
-
-    #df_out = df_out.sample(frac=1)
-    #h = int(0.8* df_out.shape[0])
-    #t = df_out.shape[0] - h
-    #print(df_out.shape[0], h,t)
-    #df_train = df_out.head(h)
-    #df_dev = df_out.tail(t)
+    # 打乱拆分成train和dev，比例 8:2
+    '''
+    df_out = df_out.sample(frac=1)
+    h = int(0.8* df_out.shape[0])
+    t = df_out.shape[0] - h
+    print(df_out.shape[0], h,t)
+    df_train = df_out.head(h)
+    df_dev = df_out.tail(t)
+    '''
 
     df_train = df_out.sample(frac=0.8,replace=False,random_state=29)
     df_dev = df_out.sample(frac=0.2,replace=False,random_state=29)

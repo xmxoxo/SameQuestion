@@ -182,13 +182,16 @@ X:.				#项目根目录
 -----------------------------------------
 ## 数据处理 2019/11/14
 
-训练数据：train.tsv
-验证数据：dev.tsv 
-预测数据：test.tsv
 
-生成全部的训练数据，然后按8:2拆分成train和dev
+按一一配对的方式生成全部的训练数据，保存为train_all.tsv 共81869条记录
+然后把全数据按8:2拆分成train和dev
+
+训练数据：train.tsv 65553
+验证数据：dev.tsv	16388
+预测数据：test.tsv	5000
 
 数据预处理：
+
 ```
 x:
 cd X:\project\DC竞赛\基于Adversarial Attack的问题等价性判别比赛\code
@@ -208,7 +211,6 @@ cd /mnt/sda1/transdat/bert-demo/bert/
 mkdir ./data/SameQuestion
 mkdir ./output/SameQuestion
 ```
-
 
 把数据文件拷到服务器,目录为：
 `/mnt/sda1/transdat/bert-demo/bert/data/SameQuestion/`
@@ -289,8 +291,7 @@ sudo python run_SameQuestion.py \
 52		new		xmxoxo		0.89160		1
 ```
 -----------------------------------------
-
-## 模型提升的思路
+## 模型提升的思路 2019/11/14
 
 * 数据增强方向：
 	同音字替换；
@@ -324,8 +325,304 @@ https://blog.csdn.net/hfutdog/article/details/81107170
 NLP中一些简单的数据增强技术 - Ted_Li - CSDN博客  
 https://blog.csdn.net/hero00e/article/details/89523970
 
+tedljw/data_augment: NLP的数据增强Demo  
+https://github.com/tedljw/data_augment
 
+数据增强思路： 对已经生成的训练数据做数据增强，这样保持原有处理的流程与逻辑；
 
 * 模型方向：
 	语义模型对比；
+-----------------------------------------
+## 数据增强
+
+参考文章及源码：
+
+NLP中一些简单的数据增强技术 - Ted_Li - CSDN博客  
+https://blog.csdn.net/hero00e/article/details/89523970
+
+tedljw/data_augment: NLP的数据增强Demo  
+https://github.com/tedljw/data_augment
+
+直接修改上面的源码，对已经生成的训练数据进行二次处理，生成数据增强后的数据:
+参数：增强系数=5，变化系数=0.1
+
+```
+cd ./code/data_augment
+python augment.py --input=../../data/train.tsv --output=train.tsv --num_aug=5 --alpha=0.1
+python augment.py --input=../../data/dev.tsv --output=dev.tsv --num_aug=5 --alpha=0.1
+```
+
+生成后的数据情况：
+训练集: train.tsv	299306
+验证集：dev.tsv		74971
+
+创建新模型目录：model-02，训练模型：
+
+开始训练：
+```shell
+cd /mnt/sda1/transdat/bert-demo/bert/
+export BERT_BASE_DIR=/mnt/sda1/transdat/bert-demo/bert/chinese_L-12_H-768_A-12
+export GLUE_DIR=/mnt/sda1/transdat/bert-demo/bert/data
+export TRAINED_CLASSIFIER=/mnt/sda1/transdat/bert-demo/bert/output
+export EXP_NAME=SameQuestion-02
+
+sudo python run_SameQuestion.py \
+  --task_name=setiment \
+  --do_train=true \
+  --do_eval=true \
+  --data_dir=$GLUE_DIR/$EXP_NAME \
+  --vocab_file=$BERT_BASE_DIR/vocab.txt \
+  --bert_config_file=$BERT_BASE_DIR/bert_config.json \
+  --init_checkpoint=$BERT_BASE_DIR/bert_model.ckpt \
+  --max_seq_length=128 \
+  --train_batch_size=32 \
+  --learning_rate=2e-5 \
+  --num_train_epochs=5.0 \
+  --output_dir=$TRAINED_CLASSIFIER/$EXP_NAME
+```
+
+训练结果：
+
+```
+INFO:tensorflow:Finished evaluation at 2019-11-15-14:40:17
+INFO:tensorflow:Saving dict for global step 46766: eval_accuracy = 0.9897314, eval_f1 = 0.9780534, eval_loss = 0.05940851, eval_precision = 0.9887907, eval_recall = 0.96754676, global_step = 46766, loss = 0.059407715
+INFO:tensorflow:Saving 'checkpoint_path' summary for global step 46766: /mnt/sda1/transdat/bert-demo/bert/output/SameQuestion-02/model.ckpt-46766
+INFO:tensorflow:evaluation_loop marked as finished
+INFO:tensorflow:***** Eval results *****
+INFO:tensorflow:  eval_accuracy = 0.9897314
+INFO:tensorflow:  eval_f1 = 0.9780534
+INFO:tensorflow:  eval_loss = 0.05940851
+INFO:tensorflow:  eval_precision = 0.9887907
+INFO:tensorflow:  eval_recall = 0.96754676
+INFO:tensorflow:  global_step = 46766
+INFO:tensorflow:  loss = 0.059407715
+```
+
+使用以下语句来进行预测：
+
+```shell
+sudo python run_SameQuestion.py \
+  --task_name=setiment \
+  --do_predict=true \
+  --data_dir=$GLUE_DIR/$EXP_NAME \
+  --vocab_file=$BERT_BASE_DIR/vocab.txt \
+  --bert_config_file=$BERT_BASE_DIR/bert_config.json \
+  --init_checkpoint=$TRAINED_CLASSIFIER/$EXP_NAME \
+  --max_seq_length=128 \
+  --output_dir=$TRAINED_CLASSIFIER/$EXP_NAME
+```
+
+结果处理成可提交的格式：
+
+```
+./code/testProcess.py 02
+
+```
+
+提交后得分为： 0.8824
+
+-----------------------------------------
+## 大模型训练
+
+群里的大佬说要用BERT Large + K fold的方法，可以跑到91以上；
+
+下载了 Large大模型：
+chinese_roberta_wwm_large_ext_L-24_H-1024_A-16.zip
+数据来源是：
+https://www.ctolib.com/amp/ymcui-Chinese-BERT-wwm.html
+
+训练数据使用最开始生成的标准数据集：
+
+使用大模型进行预测：
+
+```shell
+cd /mnt/sda1/transdat/bert-demo/bert/
+export BERT_BASE_DIR=/mnt/sda1/transdat/bert-demo/bert/chinese_roberta_wwm_large_ext_L-24_H-1024_A-16
+export GLUE_DIR=/mnt/sda1/transdat/bert-demo/bert/data
+export TRAINED_CLASSIFIER=/mnt/sda1/transdat/bert-demo/bert/output
+export EXP_NAME=SameQuestion-03
+
+sudo python run_SameQuestion.py \
+  --task_name=setiment \
+  --do_train=true \
+  --do_eval=true \
+  --data_dir=$GLUE_DIR/$EXP_NAME \
+  --vocab_file=$BERT_BASE_DIR/vocab.txt \
+  --bert_config_file=$BERT_BASE_DIR/bert_config.json \
+  --init_checkpoint=$BERT_BASE_DIR/bert_model.ckpt \
+  --max_seq_length=128 \
+  --train_batch_size=32 \
+  --learning_rate=2e-5 \
+  --num_train_epochs=5.0 \
+  --output_dir=$TRAINED_CLASSIFIER/$EXP_NAME
+```
+
+
+运行后OOM了，难道是11G的显卡跑不了Large模型? 报错如下:
+
+```
+ResourceExhaustedError (see above for traceback): OOM when allocating tensor with shape[16,16,128,128] and type float on /job:localhost/replica:0/task:0/device:GPU:0 by allocator GPU_0_bfc
+         [[node bert/encoder/layer_8/attention/self/Softmax (defined at /mnt/sda1/transdat/bert-demo/bert/modeling.py:722)  = Softmax[T=DT_FLOAT, _device="/job:localhost/replica:0/task:0/device:GPU:0"](bert/encoder/layer_8/attention/self/add)]]
+Hint: If you want to see a list of allocated tensors when OOM happens, add report_tensor_allocations_upon_oom to RunOptions for current allocation info.
+
+         [[{{node loss/Mean/_9471}} = _Recv[client_terminated=false, recv_device="/job:localhost/replica:0/task:0/device:CPU:0", send_device="/job:localhost/replica:0/task:0/device:GPU:0", send_device_incarnation=1, tensor_name="edge_6811_loss/Mean", tensor_type=DT_FLOAT, _device="/job:localhost/replica:0/task:0/device:CPU:0"]()]]
+Hint: If you want to see a list of allocated tensors when OOM happens, add report_tensor_allocations_upon_oom to RunOptions for current allocation info.
+```
+
+把`--train_batch_size`参数减小到4，可以正常训练了！
+为了快速验证结果，把`--num_train_epochs`也降到了2
+
+```shell
+cd /mnt/sda1/transdat/bert-demo/bert/
+export BERT_BASE_DIR=/mnt/sda1/transdat/bert-demo/bert/chinese_roberta_wwm_large_ext_L-24_H-1024_A-16
+export GLUE_DIR=/mnt/sda1/transdat/bert-demo/bert/data
+export TRAINED_CLASSIFIER=/mnt/sda1/transdat/bert-demo/bert/output
+export EXP_NAME=SameQuestion-03
+
+sudo python run_SameQuestion.py \
+  --task_name=setiment \
+  --do_train=true \
+  --do_eval=true \
+  --data_dir=$GLUE_DIR/$EXP_NAME \
+  --vocab_file=$BERT_BASE_DIR/vocab.txt \
+  --bert_config_file=$BERT_BASE_DIR/bert_config.json \
+  --init_checkpoint=$BERT_BASE_DIR/bert_model.ckpt \
+  --max_seq_length=128 \
+  --train_batch_size=4 \
+  --learning_rate=2e-5 \
+  --num_train_epochs=2.0 \
+  --output_dir=$TRAINED_CLASSIFIER/$EXP_NAME
+```
+
+
+运行结果：
+
+```
+INFO:tensorflow:Finished evaluation at 2019-11-18-04:08:29
+INFO:tensorflow:Saving dict for global step 32776: eval_accuracy = 0.98913836, eval_f1 = 0.97594595, eval_loss = 0.06379507, eval_precision = 0.97938704, eval_recall = 0.97252893, global_step = 32776, loss = 0.06377954
+INFO:tensorflow:Saving 'checkpoint_path' summary for global step 32776: /mnt/sda1/transdat/bert-demo/bert/output/SameQuestion-03/model.ckpt-32776
+INFO:tensorflow:evaluation_loop marked as finished
+INFO:tensorflow:***** Eval results *****
+INFO:tensorflow:  eval_accuracy = 0.98913836
+INFO:tensorflow:  eval_f1 = 0.97594595
+INFO:tensorflow:  eval_loss = 0.06379507
+INFO:tensorflow:  eval_precision = 0.97938704
+INFO:tensorflow:  eval_recall = 0.97252893
+INFO:tensorflow:  global_step = 32776
+INFO:tensorflow:  loss = 0.06377954
+```
+
+使用以下语句来进行预测：
+
+```shell
+sudo python run_SameQuestion.py \
+  --task_name=setiment \
+  --do_predict=true \
+  --data_dir=$GLUE_DIR/$EXP_NAME \
+  --vocab_file=$BERT_BASE_DIR/vocab.txt \
+  --bert_config_file=$BERT_BASE_DIR/bert_config.json \
+  --init_checkpoint=$TRAINED_CLASSIFIER/$EXP_NAME \
+  --max_seq_length=128 \
+  --output_dir=$TRAINED_CLASSIFIER/$EXP_NAME
+```
+
+
+生成提交的数据文件：
+```
+./code/testProcess.py 03
+```
+
+提交数据，得分为: 0.8962，比第一次的成绩高了0.5个百分点
+
+
+改成跑5轮：
+```
+sudo python run_SameQuestion.py \
+  --task_name=setiment \
+  --do_train=true \
+  --do_eval=true \
+  --data_dir=$GLUE_DIR/$EXP_NAME \
+  --vocab_file=$BERT_BASE_DIR/vocab.txt \
+  --bert_config_file=$BERT_BASE_DIR/bert_config.json \
+  --init_checkpoint=$BERT_BASE_DIR/bert_model.ckpt \
+  --max_seq_length=128 \
+  --train_batch_size=4 \
+  --learning_rate=2e-5 \
+  --num_train_epochs=5.0 \
+  --output_dir=$TRAINED_CLASSIFIER/$EXP_NAME
+
+```
+
+上面的训练相当于在原来的基础上继续再跑5轮了，
+训练结果：
+
+```
+INFO:tensorflow:Finished evaluation at 2019-11-18-11:04:29
+INFO:tensorflow:Saving dict for global step 81941: eval_accuracy = 0.99701, eval_f1 = 0.9933847, eval_loss = 0.022352336, eval_precision = 0.9959394, eval_recall = 0.990843, global_step = 81941, loss = 0.022346897
+INFO:tensorflow:Saving 'checkpoint_path' summary for global step 81941: /mnt/sda1/transdat/bert-demo/bert/output/SameQuestion-03/model.ckpt-81941
+INFO:tensorflow:evaluation_loop marked as finished
+INFO:tensorflow:***** Eval results *****
+INFO:tensorflow:  eval_accuracy = 0.99701
+INFO:tensorflow:  eval_f1 = 0.9933847
+INFO:tensorflow:  eval_loss = 0.022352336
+INFO:tensorflow:  eval_precision = 0.9959394
+INFO:tensorflow:  eval_recall = 0.990843
+INFO:tensorflow:  global_step = 81941
+INFO:tensorflow:  loss = 0.022346897
+
+```
+生成提交数据，提交验证结果，得分为：`0.8938` 可见跑5轮并没有提高多少得分。
+
+-----------------------------------------
+## 数据处理检查及重训练 2019/11/19
+
+队友说群里讨论的数据都是10W+的，而我们的数据只有8.9万，差了比较多，他传了一份上来，记录数是：100298条。
+看了一下数据，主要的问题是这样的：
+我们的数据生成方式是：
+```
+正 正 1
+正 负 0
+```
+
+但这里的“正样本”有分“正１”还是“正２”。
+10W+的数据样本是这样生成的：
+```
+正1 正2 1
+正2 正1 1
+正 负 0
+```
+
+这样正样本的数据量就多出了1万多条。
+
+使用这份数据样本按8:2拆分训练与验证集，条数比例为：80238: 20060，拆分成两个数据文件，然后重新进行训练：
+使用filetools工具进行打乱和划分数据；
+【注：为了简化数据处理，把数据的header行去除了。】
+模型目录名为：model-05
+
+
+使用large模型，跑3轮：
+
+```shell
+cd /mnt/sda1/transdat/bert-demo/bert/
+export BERT_BASE_DIR=/mnt/sda1/transdat/bert-demo/bert/chinese_roberta_wwm_large_ext_L-24_H-1024_A-16
+export GLUE_DIR=/mnt/sda1/transdat/bert-demo/bert/data
+export TRAINED_CLASSIFIER=/mnt/sda1/transdat/bert-demo/bert/output
+export EXP_NAME=SameQuestion-05
+
+sudo python run_SameQuestion.py \
+  --task_name=setiment \
+  --do_train=true \
+  --do_eval=true \
+  --data_dir=$GLUE_DIR/$EXP_NAME \
+  --vocab_file=$BERT_BASE_DIR/vocab.txt \
+  --bert_config_file=$BERT_BASE_DIR/bert_config.json \
+  --init_checkpoint=$BERT_BASE_DIR/bert_model.ckpt \
+  --max_seq_length=128 \
+  --train_batch_size=4 \
+  --learning_rate=2e-5 \
+  --num_train_epochs=3.0 \
+  --output_dir=$TRAINED_CLASSIFIER/$EXP_NAME
+```
+
+
 
