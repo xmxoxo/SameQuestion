@@ -571,7 +571,8 @@ INFO:tensorflow:  global_step = 81941
 INFO:tensorflow:  loss = 0.022346897
 
 ```
-生成提交数据，提交验证结果，得分为：`0.8938` 可见跑5轮并没有提高多少得分。
+生成提交数据，提交验证结果，得分为：`0.8938` 
+可见跑5轮过拟合了。
 
 -----------------------------------------
 ## 数据处理检查及重训练 2019/11/19
@@ -599,7 +600,6 @@ INFO:tensorflow:  loss = 0.022346897
 【注：为了简化数据处理，把数据的header行去除了。】
 模型目录名为：model-05
 
-
 使用large模型，跑3轮：
 
 ```shell
@@ -623,6 +623,265 @@ sudo python run_SameQuestion.py \
   --num_train_epochs=3.0 \
   --output_dir=$TRAINED_CLASSIFIER/$EXP_NAME
 ```
+
+训练结果：
+```
+INFO:tensorflow:Finished evaluation at 2019-11-19-16:20:09
+INFO:tensorflow:Saving dict for global step 60178: eval_accuracy = 0.97926325, eval_f1 = 0.9732304, eval_loss = 0.13369448, eval_precision = 0.96899027, eval_recall = 0.97750777, global_step = 60178, loss = 0.13367452
+INFO:tensorflow:Saving 'checkpoint_path' summary for global step 60178: /mnt/sda1/transdat/bert-demo/bert/output/SameQuestion-05/model.ckpt-60178
+INFO:tensorflow:evaluation_loop marked as finished
+INFO:tensorflow:***** Eval results *****
+INFO:tensorflow:  eval_accuracy = 0.97926325
+INFO:tensorflow:  eval_f1 = 0.9732304
+INFO:tensorflow:  eval_loss = 0.13369448
+INFO:tensorflow:  eval_precision = 0.96899027
+INFO:tensorflow:  eval_recall = 0.97750777
+INFO:tensorflow:  global_step = 60178
+INFO:tensorflow:  loss = 0.13367452
+
+```
+
+预测结果：
+```
+sudo python run_SameQuestion.py \
+  --task_name=setiment \
+  --do_predict=true \
+  --data_dir=$GLUE_DIR/$EXP_NAME \
+  --vocab_file=$BERT_BASE_DIR/vocab.txt \
+  --bert_config_file=$BERT_BASE_DIR/bert_config.json \
+  --init_checkpoint=$TRAINED_CLASSIFIER/$EXP_NAME \
+  --max_seq_length=128 \
+  --output_dir=$TRAINED_CLASSIFIER/$EXP_NAME
+
+```
+
+生成提交数据，提交得到：0.8992
+得分提高了很多，基本上接近0.90了
+
+在这个基础上继续跑5轮看下：
+```
+sudo python run_SameQuestion.py \
+  --task_name=setiment \
+  --do_train=true \
+  --do_eval=true \
+  --data_dir=$GLUE_DIR/$EXP_NAME \
+  --vocab_file=$BERT_BASE_DIR/vocab.txt \
+  --bert_config_file=$BERT_BASE_DIR/bert_config.json \
+  --init_checkpoint=$BERT_BASE_DIR/bert_model.ckpt \
+  --max_seq_length=128 \
+  --train_batch_size=4 \
+  --learning_rate=2e-5 \
+  --num_train_epochs=5.0 \
+  --output_dir=$TRAINED_CLASSIFIER/$EXP_NAME
+
+```
+
+训练结果：
+
+```
+INFO:tensorflow:Finished evaluation at 2019-11-19-20:35:56
+INFO:tensorflow:Saving dict for global step 100297: eval_accuracy = 0.9846967, eval_f1 = 0.9801178, eval_loss = 0.11168764, eval_precision = 0.9820896, eval_recall = 0.97815406, global_step = 100297, loss = 0.11167095
+INFO:tensorflow:Saving 'checkpoint_path' summary for global step 100297: /mnt/sda1/transdat/bert-demo/bert/output/SameQuestion-05/model.ckpt-100297
+INFO:tensorflow:evaluation_loop marked as finished
+INFO:tensorflow:***** Eval results *****
+INFO:tensorflow:  eval_accuracy = 0.9846967
+INFO:tensorflow:  eval_f1 = 0.9801178
+INFO:tensorflow:  eval_loss = 0.11168764
+INFO:tensorflow:  eval_precision = 0.9820896
+INFO:tensorflow:  eval_recall = 0.97815406
+INFO:tensorflow:  global_step = 100297
+INFO:tensorflow:  loss = 0.11167095
+```
+
+预测：
+
+```
+sudo python run_SameQuestion.py \
+  --task_name=setiment \
+  --do_predict=true \
+  --data_dir=$GLUE_DIR/$EXP_NAME \
+  --vocab_file=$BERT_BASE_DIR/vocab.txt \
+  --bert_config_file=$BERT_BASE_DIR/bert_config.json \
+  --init_checkpoint=$TRAINED_CLASSIFIER/$EXP_NAME \
+  --max_seq_length=128 \
+  --output_dir=$TRAINED_CLASSIFIER/$EXP_NAME
+
+```
+
+生成提交格式数据，提交结果。得分为：0.898
+看来跑太多轮是会过拟合的。
+得分最高的结果0.8992中，最前面几个数据预测值是这样的：
+```
+0	0
+1	0
+2	1
+3	0
+4	1
+5	1
+6	0
+7	1
+8	1
+9	0
+10	0
+11	1
+```
+
+
+-----------------------------------------
+## 分支思路
+
+思路：负样本是否也可以对调来扩大数据量？
+reduction(2233432320)  9:17:47
+这个得看模型了。如果是通过向量叠加方式计算的就有效果，如果是量化为向量距离那就没效果
+
+同时在另一张显卡上同时开始训练另一个模型？
+最优的轮数是否为2？
+
+设置第1张显卡进行训练模型：
+运行：
+```
+export CUDA_VISIBLE_DEVICES=1
+```
+使用：负 正 0 的模式扩展数据
+训练轮数设置为2，模型目录 ：model-06
+
+
+修改训练脚本，增加了可指定GPU的参数，默认为0需要时可指定为1，方便同时训练。
+由于数据增加，batch size=4也跑不动，降为2可以跑。
+```
+cd /mnt/sda1/transdat/bert-demo/bert/
+export BERT_BASE_DIR=/mnt/sda1/transdat/bert-demo/bert/chinese_roberta_wwm_large_ext_L-24_H-1024_A-16
+export GLUE_DIR=/mnt/sda1/transdat/bert-demo/bert/data
+export TRAINED_CLASSIFIER=/mnt/sda1/transdat/bert-demo/bert/output
+export EXP_NAME=SameQuestion-06
+
+sudo python run_SameQuestion.py \
+  --GPU=1 \
+  --task_name=setiment \
+  --do_train=true \
+  --do_eval=true \
+  --data_dir=$GLUE_DIR/$EXP_NAME \
+  --vocab_file=$BERT_BASE_DIR/vocab.txt \
+  --bert_config_file=$BERT_BASE_DIR/bert_config.json \
+  --init_checkpoint=$BERT_BASE_DIR/bert_model.ckpt \
+  --max_seq_length=128 \
+  --train_batch_size=2 \
+  --learning_rate=2e-5 \
+  --num_train_epochs=2.0 \
+  --output_dir=$TRAINED_CLASSIFIER/$EXP_NAME
+```
+
+训练了10个小时左右，训练结果：
+
+```
+INFO:tensorflow:Finished evaluation at 2019-11-20-03:40:33
+INFO:tensorflow:Saving dict for global step 130990: eval_accuracy = 0.84658605, eval_f1 = 0.65052867, eval_loss = 0.682613, eval_precision = 0.6969742, eval_recall = 0.6098865, global_step = 130990, loss = 0.68252987
+INFO:tensorflow:Saving 'checkpoint_path' summary for global step 130990: /mnt/sda1/transdat/bert-demo/bert/output/SameQuestion-06/model.ckpt-130990
+INFO:tensorflow:evaluation_loop marked as finished
+INFO:tensorflow:***** Eval results *****
+INFO:tensorflow:  eval_accuracy = 0.84658605
+INFO:tensorflow:  eval_f1 = 0.65052867
+INFO:tensorflow:  eval_loss = 0.682613
+INFO:tensorflow:  eval_precision = 0.6969742
+INFO:tensorflow:  eval_recall = 0.6098865
+INFO:tensorflow:  global_step = 130990
+INFO:tensorflow:  loss = 0.68252987
+```
+
+预测结果：
+```
+sudo python run_SameQuestion.py \
+  --GPU=1 \
+  --task_name=setiment \
+  --do_predict=true \
+  --data_dir=$GLUE_DIR/$EXP_NAME \
+  --vocab_file=$BERT_BASE_DIR/vocab.txt \
+  --bert_config_file=$BERT_BASE_DIR/bert_config.json \
+  --init_checkpoint=$TRAINED_CLASSIFIER/$EXP_NAME \
+  --max_seq_length=128 \
+  --output_dir=$TRAINED_CLASSIFIER/$EXP_NAME
+```
+
+生成提交格式提交结果，得分：
+
+
+
+-----------------------------------------
+##　KFold 思路与流程 2019/11/20
+
+
+比如K=5, 数据分成D1-D5,测试数据T
+
+模型1：训练集[D1,D2,D3,D4]，验证集D5，跑出模型M1，预测D5并计算出ACC1，预测T得到结果T1
+模型2：训练集[D1,D2,D3,D5]，验证集D4，跑出模型M2，预测D4并计算出ACC2，预测T得到结果T2
+模型3：训练集[D1,D2,D4,D5]，验证集D3，跑出模型M3，预测D3并计算出ACC3，预测T得到结果T3
+模型4：训练集[D1,D3,D4,D5]，验证集D2，跑出模型M4，预测D2并计算出ACC4，预测T得到结果T4
+模型5：训练集[D2,D3,D4,D5]，验证集D1，跑出模型M5，预测D1并计算出ACC5，预测T得到结果T5
+
+最终预测结果：
+加权平均：TR = (∑(Ti*ACCi) )/ (∑ACCi)
+
+
+*** 数据预处理 *** 
+增加了kfold的数据自动生成，指定fold_k参数即可自动生成K份训练数据。
+增加把test.tsv测试集自动放入目录中，不需要手工复制。
+
+已经生成了K=5份训练数据，数据自动保存在./data/kfold/目录下。
+
+传到服务器上，目录名称设置为：SameQuestion-07
+
+开始训练这5个模型,为了方便直接把训练，验证，测试全部一次执行完成：
+模型编号为奇数使用GPU0，偶数使用GPU1
+
+```
+cd /mnt/sda1/transdat/bert-demo/bert/
+export BERT_BASE_DIR=/mnt/sda1/transdat/bert-demo/bert/chinese_roberta_wwm_large_ext_L-24_H-1024_A-16
+export GLUE_DIR=/mnt/sda1/transdat/bert-demo/bert/data
+export TRAINED_CLASSIFIER=/mnt/sda1/transdat/bert-demo/bert/output
+export EXP_NAME=SameQuestion-07/model_1
+
+sudo python run_SameQuestion.py \
+  --GPU=0 \
+  --task_name=setiment \
+  --do_train=true \
+  --do_eval=true \
+  --do_predict=true \
+  --data_dir=$GLUE_DIR/$EXP_NAME \
+  --vocab_file=$BERT_BASE_DIR/vocab.txt \
+  --bert_config_file=$BERT_BASE_DIR/bert_config.json \
+  --init_checkpoint=$BERT_BASE_DIR/bert_model.ckpt \
+  --max_seq_length=128 \
+  --train_batch_size=4 \
+  --learning_rate=2e-5 \
+  --num_train_epochs=3.0 \
+  --output_dir=$TRAINED_CLASSIFIER/$EXP_NAME
+```
+
+训练模型2
+```
+cd /mnt/sda1/transdat/bert-demo/bert/
+export BERT_BASE_DIR=/mnt/sda1/transdat/bert-demo/bert/chinese_roberta_wwm_large_ext_L-24_H-1024_A-16
+export GLUE_DIR=/mnt/sda1/transdat/bert-demo/bert/data
+export TRAINED_CLASSIFIER=/mnt/sda1/transdat/bert-demo/bert/output
+export EXP_NAME=SameQuestion-07/model_2
+
+sudo python run_SameQuestion.py \
+  --GPU=1 \
+  --task_name=setiment \
+  --do_train=true \
+  --do_eval=true \
+  --do_predict=true \
+  --data_dir=$GLUE_DIR/$EXP_NAME \
+  --vocab_file=$BERT_BASE_DIR/vocab.txt \
+  --bert_config_file=$BERT_BASE_DIR/bert_config.json \
+  --init_checkpoint=$BERT_BASE_DIR/bert_model.ckpt \
+  --max_seq_length=128 \
+  --train_batch_size=4 \
+  --learning_rate=2e-5 \
+  --num_train_epochs=3.0 \
+  --output_dir=$TRAINED_CLASSIFIER/$EXP_NAME
+```
+
 
 
 
