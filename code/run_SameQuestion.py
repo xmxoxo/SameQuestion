@@ -31,6 +31,9 @@ flags = tf.flags
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_string(
+    "GPU", "0","use GPU")
+
 ## Required parameters
 flags.DEFINE_string(
     "data_dir", None,
@@ -242,10 +245,6 @@ class SetimentProcessor(DataProcessor):
       #if i == 0: 
       #  continue
       guid = "%s-%s" % (set_type, i)
-
-      #debug (by xmxoxo)
-      #print("read line: No.%d" % i)
-
       text_a = tokenization.convert_to_unicode(line[0])
       text_b = tokenization.convert_to_unicode(line[1])
       if set_type == "test":
@@ -588,7 +587,7 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
         precision = tf.metrics.precision(labels=label_ids, predictions=predictions, weights=is_real_example)
         recall = tf.metrics.recall(labels=label_ids, predictions=predictions, weights=is_real_example)
         f1 = (2 * precision[0] * recall[0] / (precision[0] + recall[0]),recall[1])
-        f1_score = tf.metrics.f1_score(labels=label_ids, predictions=predictions)
+        #f1_score = tf.metrics.f1_score(labels=label_ids, predictions=predictions)
         accuracy = tf.metrics.accuracy(
             labels=label_ids, predictions=predictions, weights=is_real_example)
         loss = tf.metrics.mean(values=per_example_loss, weights=is_real_example)
@@ -880,6 +879,7 @@ def main(_):
 
 
 if __name__ == "__main__":
+  os.environ["CUDA_VISIBLE_DEVICES"] = FLAGS.GPU
   flags.mark_flag_as_required("data_dir")
   flags.mark_flag_as_required("task_name")
   flags.mark_flag_as_required("vocab_file")

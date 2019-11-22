@@ -52,6 +52,8 @@ https://www.mitpressjournals.org/doi/full/10.1162/tacl_a_00254）。
 
 配对组合出所有可能，然后用BERT跑一个模型。
 
+
+```
 EquivalenceQuestions=3
 NotEquivalenceQuestions=3
 组合后应该是：
@@ -97,6 +99,8 @@ xxx,yyy,0
 
 一样的就用1表示
 不一样就用0表示
+```
+
 -----------------------------------------
 ## QQ群聊天记录
 
@@ -177,12 +181,14 @@ Chatbot_Retrieval
 -----------------------------------------
 ## 项目目录结构
 
+```
 X:.				#项目根目录
 ├─code			#代码
 ├─data			#数据
 │  └─model-01	#模型,多个模型按01,02...依次编号；
 ├─doc			#参考文档
 └─images		#截图
+```
 
 
 -----------------------------------------
@@ -847,6 +853,8 @@ sudo python run_SameQuestion.py \
 
 模型编号为奇数使用GPU0，偶数使用GPU1
 
+训练模型1：
+
 ```
 cd /mnt/sda1/transdat/bert-demo/bert/
 export BERT_BASE_DIR=/mnt/sda1/transdat/bert-demo/bert/chinese_roberta_wwm_large_ext_L-24_H-1024_A-16
@@ -896,6 +904,93 @@ sudo python run_SameQuestion.py \
   --output_dir=$TRAINED_CLASSIFIER/$EXP_NAME
 ```
 
+模型1和模型2在晚上23点左右完成训练，总用时约为6小时。
+
+模型3和模型4，只要修改模型目录名称就可以开始训练了，但是要注意对应的screen：
+
+模型3：
+```
+export EXP_NAME=SameQuestion-07/model_3
+```
+
+模型4：
+```
+export EXP_NAME=SameQuestion-07/model_4
+```
+
+模型5：
+```
+export EXP_NAME=SameQuestion-07/model_5
+```
+
+
+模型融合的核心算法：
+
+```
+acc =[0.9584489,0.9682052,0.9674128,0.96884906]
+T1 = [[0.9516069,0.048393086],[0.9516069,0.048393086]]
+T2 = [[0.9997036,0.0002963326],[0.9997036,0.0002963326]]
+T3 = [[0.9974492,0.0025507766],[0.9974492,0.0025507766]]
+T4 = [[0.9990158,0.0009841687],[0.9990158,0.0009841687]]
+
+T = [T1,T2,T3,T4]
+
+import numpy as np
+from functools import reduce
+
+def merge(T,acc):
+	Tm = map(lambda x,y: np.array(x)*y, T,acc)
+	Tr = reduce(lambda x,y: x+y, Tm)
+	TR = list(Tr/sum(acc))
+	return TR
+
+merge(T,acc)
+[0.9870329803139279, 0.012966985608771003]
+
+```
+
+-----------------------------------------
+## K-Fold 模型融合 2019/11/22
+
+根据目录结构，编写程序自动对输出结果进行数据处理，计算加权平均的结果。
+程序自动遍历指定的目录，然后会
+
+命令行调用, 运行过程与结果：
+
+```
+ 9:47:37.61|X:>model_merge.py ../data/model-07/
+正在自动融合模型结果...
+子目录清单:
+../data/model-07/model_1
+../data/model-07/model_2
+../data/model-07/model_3
+../data/model-07/model_4
+../data/model-07/model_5
+------------------------------
+ACC: [0.9584489, 0.9682052, 0.9674128, 0.96884906, 0.97107625]
+T的大小:5, T[0]的大小：5000
+计算后的shape：(5000, 2)
+------------------------------
+          0         1  result
+0  0.989532  0.010468       0
+1  0.999531  0.000469       0
+2  0.598490  0.401510       0
+3  0.996340  0.003659       0
+4  0.401169  0.598831       1
+5  0.000874  0.999126       1
+6  0.996234  0.003766       0
+7  0.196693  0.803307       1
+8  0.000909  0.999091       1
+9  0.880732  0.119268       0
+数据已生成:../data/model-07/result.csv
+
+```
+
+提交融合后的结果，得分： 0.90840
+
+```
+48	↑43	xmxoxo 0.90840	7
+```
 
 
 
