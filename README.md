@@ -6,7 +6,7 @@
 
 更详细的开发日志,看这里[dev_readme.md](./dev_readme.md)
 
-### Todo: 使用K Fold进行模型融合 \
+### 使用K Fold进行模型融合 当前最好成绩 0.90840
 
 完成 K-Fold [2019/11/22]
 
