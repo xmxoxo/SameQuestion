@@ -81,6 +81,7 @@ def append_DataFrame(lstEqu, lstNotEqu):
     notequ = []
     for i in list(combinations(lstEqu,2)):
         equ.append(list(i))
+        # 2019/11/19 增加 “正2 正1 1” 的样本
         equ.append(list(i)[::-1])
     for que in lstEqu:
         for nque in lstNotEqu:
@@ -121,7 +122,7 @@ def CreateTrain(fold_k = 0):
         # 2019/11/20 原始数据中会含有重复的数据，要进行过滤
         lst_Equ = list(set(lst_Equ))
         lst_NotEqu = list(set(lst_NotEqu))
-       
+
         data = append_DataFrame(lst_Equ, lst_NotEqu)
         data_all.extend(data)
 
@@ -135,8 +136,9 @@ def CreateTrain(fold_k = 0):
 
     if fold_k == 0:
         # 打乱拆分成train和dev，比例 8:2
+        rate = 0.8 
         df_out = df_out.sample(frac=1, random_state=29)
-        h = int(0.8* df_out.shape[0])
+        h = int(rate * df_out.shape[0])
         t = df_out.shape[0] - h
         print('%d==>%d,%d' % (df_out.shape[0], h,t) )
         df_train = df_out.head(h)

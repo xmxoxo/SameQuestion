@@ -62,6 +62,8 @@ label=0的9条，新组合算法：3*3=9
 
 
 可西哥  11:11:10
+
+```
 fun(lst1=[1,2,3],lst2=[4,5,6])
 返回：
 1，2，1
@@ -77,6 +79,8 @@ fun(lst1=[1,2,3],lst2=[4,5,6])
 3，4，0
 3，5，0
 3，6，0
+```
+
 
 可西哥  11:11:19
 说错了，1的3条
@@ -991,6 +995,235 @@ T的大小:5, T[0]的大小：5000
 ```
 48	↑43	xmxoxo 0.90840	7
 ```
+-----------------------------------------
+## 基于字符特征的数据集训练 2019/11/22
+
+目录名称： model-08
+数据：手工按8:2拆分，总记录：100298,拆分后： 80238: 20060
+
+开始训练模型，由于特征字符串很长，参数做了调整：
+max_seq_length改为512
+num_train_epochs改为2
+
+由于没有测试集，先去掉预测参数 `  --do_predict=true \`
+
+```
+cd /mnt/sda1/transdat/bert-demo/bert/
+export BERT_BASE_DIR=/mnt/sda1/transdat/bert-demo/bert/chinese_roberta_wwm_large_ext_L-24_H-1024_A-16
+export GLUE_DIR=/mnt/sda1/transdat/bert-demo/bert/data
+export TRAINED_CLASSIFIER=/mnt/sda1/transdat/bert-demo/bert/output
+export EXP_NAME=SameQuestion-08
+
+sudo python run_SameQuestion.py \
+  --GPU=0 \
+  --task_name=setiment \
+  --do_train=true \
+  --do_eval=true \
+  --data_dir=$GLUE_DIR/$EXP_NAME \
+  --vocab_file=$BERT_BASE_DIR/vocab.txt \
+  --bert_config_file=$BERT_BASE_DIR/bert_config.json \
+  --init_checkpoint=$BERT_BASE_DIR/bert_model.ckpt \
+  --max_seq_length=512 \
+  --train_batch_size=4 \
+  --learning_rate=2e-5 \
+  --num_train_epochs=2.0 \
+  --output_dir=$TRAINED_CLASSIFIER/$EXP_NAME
+```
+
+尝试各种参数都是OOM
+
+-----------------------------------------
+## 关于“标签泄露”
+
+```
+永不息的舞步  10:02:58
+那个线上线下差距大是因为标签泄露的原因
+
+可西哥  10:03:20
+标签泄露？
+
+可西哥  10:03:29
+这个是什么意思？
+
+永不息的舞步  10:03:58
+对的，就是验证集有训练集中的训练样例
+
+可西哥  10:04:08
+噢
+
+可西哥  10:04:17
+但是不可能有完全一样的样本啊
+
+永不息的舞步  10:04:18
+我现在搞了一下，线上线下差距0.0003
+
+可西哥  10:04:30
+怎么搞的？
+
+永不息的舞步  10:05:03
+有的，你验证集句子a或句子b肯定在训练集中了
+
+永不息的舞步  10:05:26
+pair<a, b>
+
+可西哥  10:05:34
+就是要保证在验证集里的句子a不出现在训练集中？
+
+永不息的舞步  10:05:47
+对的，
+
+永不息的舞步  10:06:07
+这样就不会标签泄露了，困扰了我一段时间
+
+永不息的舞步 2019/11/27 10:22:14
+我担心下游加多了，会破坏预训练权重
+
+可西哥 2019/11/27 10:23:20
+应该还好吧，就当BERT做向量了
+
+永不息的舞步  10:39:17
+你可以向ESIM方向试试
+```
+-----------------------------------------
+## 新数据训练
+
+目录名：SameQuestion-09	
+
+训练数据：
+```
+cd /mnt/sda1/transdat/bert-demo/bert/
+export BERT_BASE_DIR=/mnt/sda1/transdat/bert-demo/bert/chinese_roberta_wwm_large_ext_L-24_H-1024_A-16
+export GLUE_DIR=/mnt/sda1/transdat/bert-demo/bert/data
+export TRAINED_CLASSIFIER=/mnt/sda1/transdat/bert-demo/bert/output
+export EXP_NAME=SameQuestion-09
+
+sudo python run_SameQuestion.py \
+  --GPU=1 \
+  --task_name=setiment \
+  --do_train=true \
+  --do_eval=true \
+  --do_predict=true \
+  --data_dir=$GLUE_DIR/$EXP_NAME \
+  --vocab_file=$BERT_BASE_DIR/vocab.txt \
+  --bert_config_file=$BERT_BASE_DIR/bert_config.json \
+  --init_checkpoint=$BERT_BASE_DIR/bert_model.ckpt \
+  --max_seq_length=128 \
+  --train_batch_size=4 \
+  --learning_rate=2e-5 \
+  --num_train_epochs=2.0 \
+  --output_dir=$TRAINED_CLASSIFIER/$EXP_NAME
+```
+
+训练结果：
+
+```
+eval_accuracy = 0.88394815
+你的提交分数为 0.8756.
+```
+
+继续从2轮跑到5轮：
+
+
+
+-----------------------------------------
+## 新的训练数据
+
+目录名：SameQuestion-10
+
+训练数据：
+```
+cd /mnt/sda1/transdat/bert-demo/bert/
+export BERT_BASE_DIR=/mnt/sda1/transdat/bert-demo/bert/chinese_roberta_wwm_large_ext_L-24_H-1024_A-16
+export GLUE_DIR=/mnt/sda1/transdat/bert-demo/bert/data
+export TRAINED_CLASSIFIER=/mnt/sda1/transdat/bert-demo/bert/output
+export EXP_NAME=SameQuestion-10
+
+sudo python run_SameQuestion.py \
+  --GPU=0 \
+  --task_name=setiment \
+  --do_train=true \
+  --do_eval=true \
+  --do_predict=true \
+  --data_dir=$GLUE_DIR/$EXP_NAME \
+  --vocab_file=$BERT_BASE_DIR/vocab.txt \
+  --bert_config_file=$BERT_BASE_DIR/bert_config.json \
+  --init_checkpoint=$BERT_BASE_DIR/bert_model.ckpt \
+  --max_seq_length=128 \
+  --train_batch_size=4 \
+  --learning_rate=2e-5 \
+  --num_train_epochs=2.0 \
+  --output_dir=$TRAINED_CLASSIFIER/$EXP_NAME
+```
+
+本地验证集：0.88354933
+提交结果： 0.872
+
+-----------------------------------------
+## 语义解析思路
+
+```
+借车撞人了，被撞者能找车主去索赔吗?	交通事故未划分责任允许放车吗	0
+
+借车撞人了，被撞者能找车主去索赔吗?	
+==> 撞人, 找,索赔
+交通事故未划分责任允许放车吗
+==>允许,放,车
+
+租赁合同应当以什么形式订立	订立租赁合同的正确形式是什么	1
+
+租赁合同应当以什么形式订立
+==>租赁合同,订立,形式
+
+订立租赁合同的正确形式是什么
+==>订立, 租赁合同,形式, 是什么
+
+
+在公司要怎么分配会计人员	小企业应该设哪几个会计岗位？	0
+
+在公司要怎么分配会计人员
+==>要,怎么分配, 会计人员
+
+小企业应该设哪几个会计岗位？
+==> 小企业， 应该设， 哪几个，会计岗位
+
+
+公司规定休产假就没有工资，合法吗？	产假期间，用人单位不发工资合法么？	1
+
+公司规定休产假就没有工资，合法吗？
+==>没有工资,合法,吗,?
+
+产假期间，用人单位不发工资合法么？
+==>不发工资,合法,么？
+
+```
+
+
+-----------------------------------------
+## 比赛群沟通内容 
+
+沐鑫:
+还有对付这种不平衡样本，用凯明大神的focal loss
+King:
+focal loss对不平衡起作用的
+
+感谢大佬们的分享，总结了一下，大家也可以自己增加一些资料或者艾特我来添加
+https://github.com/WenRichard/DIAC2019-Adversarial-Attack-Share
+
+focalloss
+
+focal loss论文笔记(附基于keras的多类别focal loss代码) https://blog.csdn.net/qq_42277222/article/details/81711289
+
+https://github.com/maozezhong/focal_loss_multi_class
+
+
+非平衡数据集 focal loss 多类分类 https://www.zhuanzhi.ai/document/296fe8b5779b6daec7d1caf66d4f105e
+
+https://github.com/clcarwin/focal_loss_pytorch 
+https://github.com/ailias/Focal-Loss-implement-on-Tensorflow 
+https://github.com/mkocabas/focal-loss-keras
+
+关于比赛的分享：
+https://github.com/WenRichard/DIAC2019-Adversarial-Attack-Share
 
 
 

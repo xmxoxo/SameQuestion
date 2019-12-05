@@ -1,6 +1,10 @@
 # SameQuestion
 基于Adversarial Attack的问题等价性判别比赛
 
+## 使用BERT+Large中文预训练模型
+思路很简单，直接使用BERT模型跑分类；
+
+更详细的开发日志,看这里[dev_readme.md](./dev_readme.md)
 
 ### Todo: 使用K Fold进行模型融合 \
 
@@ -13,6 +17,8 @@
 ```
 
 ### 目前最好成绩 0.8992 [2019/11/20]
+
+使用large模型
 
 数据：10.1W , num_train_epochs=3.0
 生成提交数据，提交得到：0.8992
@@ -29,4 +35,10 @@
 52		new		xmxoxo		0.89160		1
 ```
 
+### 数据预处理
+
+```
+cd code
+python prePorcess.py
+```
 
